@@ -1,0 +1,26 @@
+- name: Create nginx deployment
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Create deployment
+      kubernetes:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: default
+        name: nginx-deployment
+        replicas: 3
+        spec:
+          selector:
+            match_labels:
+              app: nginx
+          template:
+            metadata:
+              labels:
+                app: nginx
+            spec:
+              containers:
+              - name: nginx
+                image: nginx
+                ports:
+                - containerPort: 80
