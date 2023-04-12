@@ -1,32 +1,67 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"log"
-	"net/http"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
+)
+
+const (
+	Namespace = "default"
+	Kind      = "Pod"
 )
 
 func main() {
-	// 设置路由处理函数
-	http.HandleFunc("/", handleHome)
-	http.HandleFunc("/api/get", handleGet)
-	http.HandleFunc("/api/post", handlePost)
+	var kubeconfig string
+	if home := homedir.HomeDir(); home != "" {
+		flag.StringVar(&kubeconfig, "kubeconfig", fmt.Sprintf("%s/.kube/config", home), "(optional) absolute path to the kubeconfig file")
+	} else {
+		flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
+	}
+	flag.Parse()
 
-	// 启动HTTP服务器
-	err := http.ListenAndServe(":8080", nil)
+	// Build config from kubeconfig file or in-cluster config
+	config, err := buildConfig(kubeconfig)
 	if err != nil {
-		log.Fatal("Failed to start HTTP server: ", err)
+		log.Fatal(err)
+	}
+
+	// Create clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// List pods
+	pods, err := clientset.CoreV1().Pods(Namespace).List(context.Background(), v1.ListOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Print pod names
+	for _, pod := range pods.Items {
+		fmt.Printf("Pod: %s\n", pod.Name)
 	}
 }
 
-func handleHome(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello, World!")
-}
-
-func handleGet(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "GET request handled")
-}
-
-func handlePost(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "POST request handled")
+func buildConfig(kubeconfig string) (*rest.Config, error) {
+	if kubeconfig == "" {
+		return rest.InClusterConfig()
+	}
+	kubeConfig, err := clientcmd.LoadFromFile(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	restConfig, err := clientcmd.NewDefaultClientConfig(*kubeConfig, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	return restConfig, nil
 }
