@@ -9,13 +9,18 @@ import (
 	"github.com/gorilla/mux"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 
 	"OpsWorks/api"
 )
 
 func main() {
 	var kubeconfig string
-	flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
+	if home := homedir.HomeDir(); home != "" {
+		flag.StringVar(&kubeconfig, "kubeconfig", fmt.Sprintf("%s/.kube/config", home), "(optional) absolute path to the kubeconfig file")
+	} else {
+		flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
+	}
 	flag.Parse()
 
 	// Build config from kubeconfig file or in-cluster config
@@ -45,7 +50,9 @@ func main() {
 }
 
 func buildConfig(kubeconfig string) (*rest.Config, error) {
+	fmt.Println(kubeconfig)
 	if kubeconfig == "" {
+		fmt.Println("InClusterConfig")
 		return rest.InClusterConfig()
 	}
 
